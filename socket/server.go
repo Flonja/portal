@@ -32,6 +32,12 @@ type Server interface {
 	SessionStore() *session.Store
 	// ServerRegistry returns the registry used to store available servers on the proxy.
 	ServerRegistry() *server.Registry
+
+	// Handler returns the handler for the server.
+	Handler() Handler
+	// Handle sets the handler for the server which can be used to handle different events.
+	// If the handler is nil, a NopHandler is used instead.
+	Handle(h Handler)
 }
 
 // DefaultServer represents a basic TCP socket server implementation. It allows external connections to
@@ -50,6 +56,10 @@ type DefaultServer struct {
 
 	sessionStore   *session.Store
 	serverRegistry *server.Registry
+
+	hMutex sync.RWMutex
+	// h holds the current handler of the session.
+	h Handler
 }
 
 // NewDefaultServer creates a new default server to be used for accepting socket connections.
@@ -66,6 +76,8 @@ func NewDefaultServer(addr, secret string, sessionStore *session.Store, serverRe
 
 		sessionStore:   sessionStore,
 		serverRegistry: serverRegistry,
+
+		h: NopHandler{},
 	}
 }
 
@@ -189,6 +201,24 @@ func (s *DefaultServer) SessionStore() *session.Store {
 // ServerRegistry ...
 func (s *DefaultServer) ServerRegistry() *server.Registry {
 	return s.serverRegistry
+}
+
+// Handler ...
+func (s *DefaultServer) Handler() Handler {
+	s.hMutex.RLock()
+	defer s.hMutex.RUnlock()
+	return s.h
+}
+
+// Handle ...
+func (s *DefaultServer) Handle(h Handler) {
+	s.hMutex.Lock()
+	defer s.hMutex.Unlock()
+
+	if h == nil {
+		h = NopHandler{}
+	}
+	s.h = h
 }
 
 // containsAny checks if the string contains any of the provided sub strings.

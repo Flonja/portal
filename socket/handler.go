@@ -1,38 +1,18 @@
 package socket
 
-import (
-	"github.com/paroxity/portal/socket/packet"
-)
-
-// PacketHandler represents a type which handles a specific packet coming from a client.
-type PacketHandler interface {
-	// Handle is responsible for handling an incoming packet for the client.
-	Handle(p packet.Packet, src Server, c *Client) error
-	// RequiresAuth returns if the client must be authenticated in order for the handler to be triggered.
-	RequiresAuth() bool
+// Handler handles events that are called by a client.
+type Handler interface {
+	// HandlePluginMessage handles a packet that's sent by the client to send custom "logic" data.
+	HandlePluginMessage(c *Client, channel string, message []byte)
 }
 
-var handlers = make(map[uint16]PacketHandler)
+// NopHandler implements the Handler interface but does not execute any code when an event is called. The
+// default handler of sessions is set to NopHandler.
+// Users may embed NopHandler to avoid having to implement each method.
+type NopHandler struct{}
 
-// RegisterHandler registers a PacketHandler for the provided packet ID. Handlers do not stack, meaning
-// registering multiple handlers for the same id will override the previous one.
-func RegisterHandler(id uint16, h PacketHandler) {
-	handlers[id] = h
-}
+// Compile time check to make sure NopHandler implements Handler.
+var _ Handler = (*NopHandler)(nil)
 
-func init() {
-	RegisterHandler(packet.IDAuthRequest, &AuthRequestHandler{})
-	RegisterHandler(packet.IDRegisterServer, &RegisterServerHandler{})
-	RegisterHandler(packet.IDTransferRequest, &TransferRequestHandler{})
-	RegisterHandler(packet.IDPlayerInfoRequest, &PlayerInfoRequestHandler{})
-	RegisterHandler(packet.IDServerListRequest, &ServerListRequestHandler{})
-	RegisterHandler(packet.IDFindPlayerRequest, &FindPlayerRequestHandler{})
-}
-
-// requireAuth implements the RequiresAuth() method and always returns true.
-type requireAuth struct{}
-
-// RequiresAuth ...
-func (*requireAuth) RequiresAuth() bool {
-	return true
-}
+// HandlePluginMessage ...
+func (NopHandler) HandlePluginMessage(*Client, string, []byte) {}
